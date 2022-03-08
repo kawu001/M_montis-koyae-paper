@@ -1,0 +1,84 @@
+You can get the full tutorials from https://speciationgenomics.github.io/fastsimcoal2/
+
+Before running FastSimCoal, we need to convert the vcf onto a SFS file. We algo need to guarantee the vcf was not trimmed for minimum allele frequency.
+
+First, let's generate such vcf.
+
+I am using the vcf file from stacks without outgroups in it.
+
+# 1. filters
+vcftools --vcf Stygocapitella.subterranea.josemariobrancoi.westheidei.r50.p8.stacks.vcf \
+--max-missing 0.25 --max-meanDP 100 --min-meanDP 10 --recode --stdout > Meehania.r80.p5.stacks.maxMeanDP100.forFSC.vcf
+
+# 2. removing individuals pjc 62 and pjc 64
+
+vcftools --vcf Meehania.r80.p5.stacks.maxMeanDP100.forFSC.vcf --missing-indv
+
+cat out.imiss | awk '$5>0.90' |  awk 'FNR > 1 {print $1}' > highmissingdata.indv
+
+vcftools --vcf Meehania.r80.p5.stacks.maxMeanDP100.forFSC.vcf --remove highmissingdata.indv --recode --stdout > vcfFSC.vcf
+
+# 3. We need to generate files to be used for FastSimCoal, to do this:
+https://github.com/isaacovercast/easySFS
+
+# 4. Get the samples ID from a VCF to generate population file for Japan  and China
+grep "^#CHROM" vcfFSC.vcf | tr '\t' '\n' | grep -v -E '#CHROM|POS|ID|REF|ALT|QUAL|FILTER|INFO|FORMAT' > pops.tsv
+
+# 5. To use EasySFS, you'll need to activate it
+conda activate easySFS
+
+# 6. The first step is to run a preview to identify the values for projecting down each population. 
+/public/home/WHC_BBT/easySFS/easySFS.py -i /public/home/WHC_BBT/FastSimCoal/vcfFSC.vcf -p /public/home/WHC_BBT/FastSimCoal/easySFS.input1.tsv --preview
+The preview showed China = 102 and Japan = 22, the I used the rule of thumb, so I used China = 40, and Japan = 20.
+
+# 7. Next run the script with the values for projecting for each population, like this:
+/public/home/WHC_BBT/easySFS/easySFS.py -i /public/home/WHC_BBT/FastSimCoal/vcfFSC.vcf -p /public/home/WHC_BBT/FastSimCoal/easySFS.input1.tsv --proj 40,20
+
+# 8. Running FastSimCoal!
+
+a. Do your models as in 11_fscScenarios (each model needs an .est and a .tpl file).
+
+b. Create folders in the working directory, one for each scenario. For instance ancient_geneflow
+
+PREFIX=ancient_geneflow
+TEMPLATE=${PREFIX}.tpl
+ESTIMATES=${PREFIX}.est
+obs_file=/public/home/WHC_BBT/Fastsimcoal_Meehania_PCA/1.ancient_geneflow/ancient_geneflow_MSFS.obs
+
+for i in {1..50}
+ do
+   mkdir run$i
+   cp ${PREFIX}.tpl ${PREFIX}.est ${PREFIX}_MSFS.obs run$i"/"
+   cd run$i
+   /public/home/WHC_BBT/fsc27_linux64/fsc2702 -t ${PREFIX}.tpl -e ${PREFIX}.est -m -0 -C 10 -n 100000 -L 40 -c 30 -B 30 -s0 -M -q --multiSFS
+   cd ..
+ 
+ done
+
+
+#9. Finding the best run using a script from Joana (https://github.com/speciationgenomics/scripts/raw/master/fsc-selectbestrun.sh)
+	./fsc-selectbestrun.sh
+
+#10. Model comparison with Likelihood distributions
+
+PREFIX=ancient_geneflow
+cd ~/public/home/WHC_BBT/Fastsimcoal_Meehania_PCA/1.ancient_geneflow/bestrun/
+
+# create temporary obs file with name _maxL_MSFS.obs
+cp ${PREFIX}_MSFS.obs ${PREFIX}_maxL_MSFS.obs
+
+# Run fastsimcoal 20 times (in reality better 100 times) to get the likelihood of the observed SFS under the best parameter values with 1 mio simulated SFS.
+for iter in {1..10000}
+do
+ /public/home/WHC_BBT/fsc27_linux64/fsc2702 -i ${PREFIX}_maxL.par -n1000000 -m -q -0 -c30 --multiSFS
+ # Fastsimcoal will generate a new folder called ${model}_maxL and write files in there
+
+ # collect the lhood values (Note that >> appends to the file, whereas > would overwrite it)
+ sed -n '2,3p' ${PREFIX}_maxL/${PREFIX}_maxL.lhoods  >> ${PREFIX}.lhoods
+
+ # delete the folder with results
+ rm -r ${PREFIX}_maxL/
+done
+
+
+

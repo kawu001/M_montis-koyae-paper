@@ -1,0 +1,44 @@
+Running Admixture
+
+1. # Make a directory in the home directory
+cd ~
+mkdir ADMIXTURE
+cd ADMIXTURE
+
+2. # Generate the input file in plink format
+plink --vcf Meehania.montis.koyae.withoutoutgroup.r0.8.p5.stacks.maf0.05.maxMeanDP100.minMeanDP10.indswith90missingnessRemoved.randomSNP.vcf --make-bed --out MeehaniaAdmix --allow-extra-chr
+
+3. # ADMIXTURE does not accept chromosome names that are not human chromosomes. We will thus just exchange the first column by 0
+awk '{$1=0;print $0}' MeehaniaAdmix.bim > MeehaniaAdmix.bim.tmp
+
+mv MeehaniaAdmix.bim.tmp MeehaniaAdmix.bim
+
+4. Run all codes together at once
+
+for K in {2..12};
+
+  do admixture --cv ZY.bed $K |tee log${K}.out;
+
+  done
+  
+5. To check the best K, choose the lowest using this command
+
+grep -h CV log*.out
+
+CV error (K=10): 0.14375
+CV error (K=11): 0.19003
+CV error (K=12): 0.18347
+CV error (K=2): 0.46980
+CV error (K=3): 0.42992
+CV error (K=4): 0.19363
+CV error (K=5): 0.19676
+CV error (K=6): 0.15583
+CV error (K=7): 0.09220
+CV error (K=8): 0.13769
+CV error (K=9): 0.11271
+
+K=7 is the lowest
+
+
+Tutorial
+https://www.jianshu.com/p/c8b15484e2b0

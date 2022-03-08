@@ -1,0 +1,63 @@
+Now for the MDS with PCA
+
+```
+# We will do the MDS using plink, a commonly used pipeline for population genetics data.
+# 1. Getting the vcf to plink format..
+VCF=Stygocapitella.subterranea.josemariobrancoi.westheidei.r50.p8.stacks.maf0.05.maxMeanDP100.minMeanDP10.indswith90missingnessRemoved.randomSNP.vcf
+vcftools --vcf $VCF --plink
+# Note, theoutput will just be called "out".
+# 2. We need to add a "c" in front of chromossome so it is not just a number, otherwise plink will not like it.
+awk '{print "c"$1 "\tc" $2 "\t" $3 "\t" $4}' out.map > out.tmp
+mv out.tmp out.map
+# 3. Now we need a genome file:
+plink --file out --genome --allow-extra-chr --double-id
+# 4. and finally the plot :-)
+plink --file out --read-genome plink.genome --cluster --mds-plot 2 --allow-extra-chr --double-id
+```
+
+Now we move to R, to do the plotting:
+
+```
+#### R
+rm(list=ls())
+
+library(ggplot2)
+library(tidyverse)
+
+MDS = read.table("plink.mds", header = T)
+
+ggplot(MDS, aes(x = C1, y = C2, colour = FID)) + geom_point()
+
+
+##save myData into .csv and add population ID and Country
+
+write.csv(x=MDS, file = "myMDS.csv", row.names = TRUE)
+
+##Load the .csv file 
+myMDS2<-read.csv("myMDS.csv",header = T)
+
+
+head(myMDS2,5)
+
+##identify the columns again
+rownames(myMDS2) <- myMDS2$FID
+
+##plot the data
+ggplot(myMDS2, aes(C1, C2, colour=pop, shape = country)) +
+  geom_point(size=4)
+
+ggplot(myMDS2, aes(C1, C2, colour=pop, shape = country)) +
+  geom_point(size=4) + theme_bw()
+
+
+ggsave( 
+       filename = "MeehaniaMDS.jpeg",
+       plot = last_plot(),
+       path = "C:/Users/Bashir/Desktop/Meehania/Population results/MDS with 62 individuals",
+       scale = 1,
+       width = 18,
+       height = 15, 
+       units = "cm",
+       dpi = 500,
+       limitsize = TRUE,
+       )

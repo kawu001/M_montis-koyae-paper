@@ -1,0 +1,53 @@
+1. Rename the populations.snp.vcf to species name for easy recognition
+
+mv populations.snps.vcf Meehania.montis.koyae.withoutoutgroup.r0.8.p5.stacks.vcf
+
+Zip the renamed file to make it easy when filtering vcf
+
+gzip Meehania.montis.koyae.withoutoutgroup.r0.8.p5.stacks.vcf
+
+
+https://github.com/jcerca/Papers/blob/aa240278f70298261b80a0c77fc2aeb9fd056e52/Stygocapitella_PeerJ/02_cleaningTheVcf_andVariousAnalysis
+
+2. On 01_ we cleaned our .vcf for -r 0.8 and -p 5. This is not enough since it still violates the assumptions of some analysis.
+
+For example, for PCA we need the data to be independent, and we should add coverage filters to remove repeated regions and regions with low coverage (we have low confidence on these variants).
+
+
+We start by adding a minimum allele frequency, max depth and minimum depth cut-off:
+```
+vcftools --gzvcf Meehania.new.r0.8.p5.stacks.vcf.gz --recode --stdout --maf 0.05 --max-meanDP 100 --min-meanDP 10 > Meehania.new.r0.8.p5.stacks.maf0.05.maxMeanDP100.minmkdir MeanDP10.vcf
+
+# I know! The file name is huge. But it allows us knowing what filters we have:
+# -r 0.8 -p 5 (from before
+# minimum allele frequency of 0.05, max depth of 100 and minimum depth of 10.
+```
+
+3. Now, we analyse missing data.
+
+```
+# First, we use vcftools to get a grasp of % of missing data.
+
+vcftools --missing-indv --vcf Meehania.new.r0.8.p5.stacks.maf0.05.maxMeanDP100.minMeanDP10.vcf
+
+4. I removed individuals with more than 50% missing data (pjc62 and pjc64)
+
+a. vcftools --remove-indv pjc62 --gzvcf Meehania.montis.koyae.withoutoutgroup.r0.8.p5.stacks.vcf.gz --recode --out Meehania.r80.p5.maf0.05.maxMeanDP100.minMeanDP10.missingindvRemove62.vcf.recode.vcf
+b. vcftools --remove-indv pjc64 --gzvcf Meehania.montis.nomissing.withoutoutgroup.vcf.recode.vcf --recode --out Meehania.r80.p5.maf0.05.maxMeanDP100.minMeanDP10.missingindvRemoved.recode.vcf
+
+```
+
+OK. Final cleaning we need one random SNP per radseq locus. There are easier ways to do this (e.g. using the --write-single-snp flag in the module "populations"), but it wasn't working in the version of stacks I was using.
+
+```
+# First, we separate the header of the VCF (lines starting with #), and keep only a variant per chromosome. We save this on a file called "randomized.noheader.vcf"
+
+VCF=eehania.new.r0.8.p5.stacks.maf0.05.maxMeanDP100.minMeanDP10.vcf
+grep -v "^#" $VCF | sort -R  | awk ' {if (count[$1] < 1) {count[$1]++; print $0}}' > randomized.noheader.vcf
+
+# Now, we get the header isolated:
+grep "^#" $VCF > header.tsv
+
+# and get them together, using an even more appalling name:
+
+cat header.tsv randomized.noheader.vcf > Meehania.r0.8.p5.stacks.maf0.05.maxMeanDP100.minMeanDP10.randomSNP.vcf

@@ -1,0 +1,26 @@
+PCA using PLINK and R studio
+
+ #### UNIX
+myVCF=Meehania.randomSNP.vcf
+sed -i '/^[0-9].*/ s/^/chromossome/' $myVCF # plink does not like chr
+plink --vcf Meehania.randomSNP.vcf --double-id --allow-extra-chr --set-missing-var-ids @:# --allow-no-sex --out ${myVCF} --pca 6
+
+plink --version # PLINK v1.90b6.18 64-bit (16 Jun 2020) 
+
+ #### R
+#Clean up!
+rm(list=ls())
+
+#Set Working directory
+setwd("./Downloads/")
+
+library(tidyverse)
+
+myData<-read_table2("Meehania.new.r0.8.p5.stacks.vcf.eigenvec", col_names =F)
+colnames(myData) <- c("ID","IDrep","PC1","PC2","PC3","PC4","PC5", "PC6")
+
+ggplot(myData, aes(PC1, PC2, colour=ID)) +
+  geom_point(size=3) +
+  theme_minimal() +
+  xlab("PC1 (38.11%)") +
+  ylab("PC2 (25.02%)") 
